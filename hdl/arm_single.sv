@@ -207,12 +207,15 @@ module decoder (input  logic [1:0] Op,
            4'b0000: ALUControl = 2'b10; // AND
            4'b1100: ALUControl = 2'b11; // ORR
            4'b1010: ALUControl = 2'b01; // CMP
+           4'b1001: ALUControl = 2'b11; // TEQ wrong
+           4'b1000: ALUControl = 2'b10; // TST
+           4'b1011: ALUControl = 2'b00; // CMN
            default: ALUControl = 2'bx;  // unimplemented
          endcase
          // update flags if S bit is set
          // (C & V only updated for arith instructions)
-         FlagW[1]      = Funct[0]; // FlagW[1] = S-bit
-         // FlagW[0] = S-bit & (ADD | SUB)
+         FlagW[1]      = Funct[0]; // FlagW[1] = S-bit, all instructions
+         // FlagW[0] = S-bit & (ADD | SUB) ADD and SUB only
          FlagW[0]      = Funct[0] & (ALUControl == 2'b00 | ALUControl == 2'b01);
        end
      else
