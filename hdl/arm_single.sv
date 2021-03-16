@@ -133,7 +133,7 @@ module controller (input  logic         clk, reset,
                    output logic         MemStrobe);
 
    logic [1:0] FlagW;
-   logic       PCS, RegW, MemW;
+   logic       PCS, RegW, MemW, write;
 
    decoder dec (.Op(Instr[27:26]),
                 .Funct(Instr[25:20]),
@@ -142,6 +142,7 @@ module controller (input  logic         clk, reset,
                 .PCS(PCS),
                 .RegW(RegW),
                 .MemW(MemW),
+                .write(write),
                 .MemtoReg(MemtoReg),
                 .ALUSrc(ALUSrc),
                 .ImmSrc(ImmSrc),
@@ -152,6 +153,7 @@ module controller (input  logic         clk, reset,
                  .reset(reset),
                  .Cond(Instr[31:28]),
                  .ALUFlags(ALUFlags),
+                 .write(write),
                  .FlagW(FlagW),
                  .PCS(PCS),
                  .RegW(RegW),
@@ -165,7 +167,7 @@ module decoder (input  logic [1:0] Op,
                 input  logic [5:0] Funct,
                 input  logic [3:0] Rd,
                 output logic [1:0] FlagW,
-                output logic       PCS, RegW, MemW,
+                output logic       PCS, RegW, MemW, noWrite
                 output logic       MemtoReg, ALUSrc,
                 output logic [1:0] ImmSrc, ALUControl,
                 output logic [2:0] RegSrc,
@@ -207,6 +209,7 @@ module decoder (input  logic [1:0] Op,
            4'b0000: ALUControl = 2'b10; // AND
            4'b1100: ALUControl = 2'b11; // ORR
            4'b1010: ALUControl = 2'b01; // CMP
+                    noWrite = 1'b1;
            4'b1001: ALUControl = 2'b11; // TEQ wrong
            4'b1000: ALUControl = 2'b10; // TST
            4'b1011: ALUControl = 2'b00; // CMN
@@ -232,6 +235,7 @@ endmodule // decoder
 module condlogic (input  logic       clk, reset,
                   input  logic [3:0] Cond,
                   input  logic [3:0] ALUFlags,
+                  input  logic       noWrite,
                   input  logic [1:0] FlagW,
                   input  logic       PCS, RegW, MemW,
                   output logic       PCSrc, RegWrite, MemWrite);
@@ -257,7 +261,7 @@ module condlogic (input  logic       clk, reset,
                  .Flags(Flags),
                  .CondEx(CondEx));
    assign FlagWrite = FlagW & {2{CondEx}};
-   assign RegWrite  = RegW  & CondEx;
+   assign RegWrite  = RegW  & CondEx & ~noWrite;
    assign MemWrite  = MemW  & CondEx;
    assign PCSrc     = PCS   & CondEx;
 
@@ -458,10 +462,11 @@ module mux2 #(parameter WIDTH = 8)
 endmodule // mux2
 
 module alu (input  logic [31:0] a, b,
-            input  logic [ 1:0] ALUControl,
+            input  logic [s1:0] ALUControl,
             input  logic carryIn,
             output logic [31:0] Result,
-            output logic [ 3:0] ALUFlags);
+            output logic [ 3:0] ALUFlags,
+            output logic noWrite);
 
    logic        neg, zero, carry, overflow;
    logic [31:0] condinvb;
