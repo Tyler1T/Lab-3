@@ -580,7 +580,7 @@ module shifter(input logic [6:0] shiftIn,
           2'b00: assign dataOut = dataIn << shiftIn[6:2];
           2'b01: assign dataOut = dataIn >> shiftIn[6:2];
           2'b10: assign dataOut = dataIn >>> shiftIn[6:2];
-          2'b11: assign dataOut = {dataIn[30:1], dataIn[31]}; // need to repeat this n times
+          2'b11: assign dataOut = {dataIn, dataIn} >> (shift[3:0]); // need to repeat this n times
           default: dataOut = dataIn;
         endcase
 
