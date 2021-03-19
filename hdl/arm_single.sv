@@ -211,8 +211,10 @@ module decoder (input  logic [1:0] Op,
            4'b1100: ALUControl = 3'b011; // ORR
            4'b1010: ALUControl = 3'b001; // CMP = SUB + noWrite
                     noWrite = 1'b1;
-           4'b1001: ALUControl = 3'b011; // TEQ = EOR + noWrite
+           4'b1001: ALUControl = 3'b110; // TEQ = EOR + noWrite
+                    noWrite = 1'b1;
            4'b1000: ALUControl = 3'b010; // TST = AND + noWrite
+                    noWrite = 1'b1;
            4'b1011: ALUControl = 3'b000; // CMN = ADD + noWrite
                     noWrite = 1'b1;
            4'b1111: ALUControl = 3'b101; // MVN
@@ -224,11 +226,11 @@ module decoder (input  logic [1:0] Op,
          // (C & V only updated for arith instructions)
          FlagW[1]      = Funct[0]; // FlagW[1] = S-bit, all instructions
          // FlagW[0] = S-bit & (ADD | SUB) ADD and SUB only
-         FlagW[0]      = Funct[0] & (ALUControl == 2'b00 | ALUControl == 2'b01);
+         FlagW[0]      = Funct[0] & (ALUControl == 3'b000 | ALUControl == 3'b001);
        end
      else
        begin
-         ALUControl = 2'b00; // add for non-DP instructions
+         ALUControl = 3'b000; // add for non-DP instructions
          FlagW      = 2'b00; // don't update Flags
        end
 
@@ -395,7 +397,6 @@ module regfile (input  logic        clk,
                 input  logic        we3,
                 input  logic [ 3:0] ra1, ra2, wa3,
                 input  logic [31:0] wd3, r15,
-                input  logic [6:0] shift,
                 output logic [31:0] rd1, rd2);
 
    logic [31:0] rf[14:0];
@@ -432,10 +433,9 @@ endmodule // extend
 
 module adder #(parameter WIDTH=8)
    (input  logic [WIDTH-1:0] a, b,
-    input  logic carryIn,
     output logic [WIDTH-1:0] y);
 
-   assign y = a + b + carryIn;
+   assign y = a + b;
 
 endmodule // adder
 
@@ -493,6 +493,9 @@ module alu (input  logic [31:0] a, b,
        3'b00?:  Result = sum;
        3'b010:  Result = a & b;
        3'b011:  Result = a | b;
+       3'b110:  Result = a ^ b;
+       3'b101:  Result = ~a;
+       3'b100:  Result = a ^ ~b;
        default: Result = 32'bx;
      endcase
 
@@ -510,13 +513,12 @@ module shifter(input logic [6:0] shiftIn,
                 input logic [31:0] dataIn,
                 output logic [31:0] dataOut);
       logic [1:0] shiftType = shiftIn[1:0];
-      logic shift[4:0] = shiftIn[6:2];
 
       always_comb
         case(shiftType)
-          2'b00: assign dataOut = dataIn << shift;
-          2'b01: assign dataOut = dataIn >> shift;
-          2'b10: assign dataOut = dataIn >>> shift;
+          2'b00: assign dataOut = dataIn << shiftIn[6:2];
+          2'b01: assign dataOut = dataIn >> shiftIn[6:2];
+          2'b10: assign dataOut = dataIn >>> shiftIn[6:2];
           2'b11: assign dataOut = {dataIn[30:1], dataIn[31]}; // need to repeat this n times
           default: dataOut = dataIn;
         endcase
