@@ -557,6 +557,7 @@ module alu (input  logic [31:0] a, b,
        3'b110:  Result = a ^ b;
        3'b101:  Result = ~a;
        3'b100:  Result = a ^ ~b;
+       3'b111:  Result = b;
        default: Result = 32'bx;
      endcase
 
