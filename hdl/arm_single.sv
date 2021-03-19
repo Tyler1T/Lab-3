@@ -215,7 +215,7 @@ module decoder (input  logic [1:0] Op,
            4'b1000: ALUControl = 3'b010; // TST = AND + noWrite
            4'b1011: ALUControl = 3'b000; // CMN = ADD + noWrite
                     noWrite = 1'b1;
-           4'b1111: ALUControl = 3'b101; // MVN 
+           4'b1111: ALUControl = 3'b101; // MVN
            4'b0001: ALUControl = 3'b110; //EOR
            4'b1110: ALUControl = 3'b100; //BIC = Rn & ~Src2
            default: ALUControl = 3'bx;  // unimplemented
@@ -475,8 +475,7 @@ module alu (input  logic [31:0] a, b,
             input  logic [2:0] ALUControl,
             input  logic carryIn,
             output logic [31:0] Result,
-            output logic [ 3:0] ALUFlags,
-            input logic noWrite);
+            output logic [ 3:0] ALUFlags);
 
    logic        neg, zero, carry, overflow;
    logic [31:0] condinvb;
