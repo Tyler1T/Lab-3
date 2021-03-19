@@ -209,27 +209,72 @@ module decoder (input  logic [1:0] Op,
      if (ALUOp)
        begin                 // which DP Instr?
          case(Funct[4:1])
-           4'b0100: ALUControl = 3'b000; // ADD
-           4'b0101: ALUControl = 3'b000; // ADD + carry
-                    carryControl = 1;
-           4'b0010: ALUControl = 3'b001; // SUB
-           4'b0110: ALUControl = 3'b001; // SUB + carry
-           4'b0000: ALUControl = 3'b010; // AND
-           4'b1100: ALUControl = 3'b011; // ORR
+           4'b0100: begin
+                      ALUControl = 3'b000; // ADD
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b0101: begin
+                      ALUControl = 3'b000; // ADD + carry
+                      noWrite = 0'b1;
+                      carryControl = 1'b1;
+
+                    end
+           4'b0010: begin
+                      ALUControl = 3'b001; // SUB
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b0110: begin
+                      ALUControl = 3'b001; // SUB + carry
+                      noWrite = 0'b1;
+                      carryControl = 1'b0;
+                    end
+           4'b0000: begin
+                      ALUControl = 3'b010; // AND
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b1100: begin
+                      ALUControl = 3'b011; // ORR
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
            4'b1010: begin
                       endALUControl = 3'b001; // CMP = SUB + noWrite
                       noWrite = 1'b1;
-                      carryControl = 1'b0;
+                      carryControl = 0'b0;
                     end
-           4'b1001: ALUControl = 3'b110; // TEQ = EOR + noWrite
-                    noWrite = 1'b1;
-           4'b1000: ALUControl = 3'b010; // TST = AND + noWrite
-                    noWrite = 1'b1;
-           4'b1011: ALUControl = 3'b000; // CMN = ADD + noWrite
-                    noWrite = 1'b1;
-           4'b1111: ALUControl = 3'b101; // MVN
-           4'b0001: ALUControl = 3'b110; //EOR
-           4'b1110: ALUControl = 3'b100; //BIC = Rn & ~Src2
+           4'b1001: begin
+                      ALUControl = 3'b110; // TEQ = EOR + noWrite
+                      noWrite = 1'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b1000: begin
+                      ALUControl = 3'b010; // TST = AND + noWrite
+                      noWrite = 1'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b1011: begin
+                      ALUControl = 3'b000; // CMN = ADD + noWrite
+                      noWrite = 1'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b1111: begin
+                      ALUControl = 3'b101; // MVN
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b0001: begin
+                      ALUControl = 3'b110; //EOR
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
+           4'b1110: begin
+                      ALUControl = 3'b100; //BIC = Rn & ~Src2
+                      noWrite = 0'b1;
+                      carryControl = 0'b0;
+                    end
            default: ALUControl = 3'bx;  // unimplemented
          endcase
          // update flags if S bit is set
