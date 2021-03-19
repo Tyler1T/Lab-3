@@ -167,7 +167,7 @@ module decoder (input  logic [1:0] Op,
                 input  logic [5:0] Funct,
                 input  logic [3:0] Rd,
                 output logic [1:0] FlagW,
-                output logic       PCS, RegW, MemW, noWrite
+                output logic       PCS, RegW, MemW, noWrite,
                 output logic       MemtoReg, ALUSrc,
                 output logic [1:0] ImmSrc,
                 output logic [2:0] ALUControl,
@@ -204,17 +204,20 @@ module decoder (input  logic [1:0] Op,
        begin                 // which DP Instr?
          case(Funct[4:1])
            4'b0100: ALUControl = 3'b000; // ADD
-           4'b0101: ALUControl = 3'b000; // ADD w/ carry
+           4'b0101: ALUControl = 3'b000; // ADD + carry
            4'b0010: ALUControl = 3'b001; // SUB
-           4'b0110: ALUControl = 3'b001; // SUB w/ carry
+           4'b0110: ALUControl = 3'b001; // SUB + carry
            4'b0000: ALUControl = 3'b010; // AND
            4'b1100: ALUControl = 3'b011; // ORR
-           4'b1010: ALUControl = 3'b001; // CMP
+           4'b1010: ALUControl = 3'b001; // CMP = SUB + noWrite
                     noWrite = 1'b1;
-           4'b1001: ALUControl = 3'b011; // TEQ wrong
-           4'b1000: ALUControl = 3'b010; // TST
-           4'b1011: ALUControl = 3'b000; // CMN
+           4'b1001: ALUControl = 3'b011; // TEQ = EOR + noWrite
+           4'b1000: ALUControl = 3'b010; // TST = AND + noWrite
+           4'b1011: ALUControl = 3'b000; // CMN = ADD + noWrite
                     noWrite = 1'b1;
+           4'b1111: ALUControl = 3'b101; // MVN 
+           4'b0001: ALUControl = 3'b110; //EOR
+           4'b1110: ALUControl = 3'b100; //BIC = Rn & ~Src2
            default: ALUControl = 3'bx;  // unimplemented
          endcase
          // update flags if S bit is set
@@ -392,7 +395,7 @@ module regfile (input  logic        clk,
                 input  logic        we3,
                 input  logic [ 3:0] ra1, ra2, wa3,
                 input  logic [31:0] wd3, r15,
-                input  logic [6:0] shift
+                input  logic [6:0] shift,
                 output logic [31:0] rd1, rd2);
 
    logic [31:0] rf[14:0];
@@ -429,9 +432,10 @@ endmodule // extend
 
 module adder #(parameter WIDTH=8)
    (input  logic [WIDTH-1:0] a, b,
+    input  logic carryIn,
     output logic [WIDTH-1:0] y);
 
-   assign y = a + b;
+   assign y = a + b + carryIn;
 
 endmodule // adder
 
@@ -478,16 +482,18 @@ module alu (input  logic [31:0] a, b,
    logic [31:0] condinvb;
    logic [32:0] sum;
 
+
+
    // check if we are adding or subtracting and set b accordingly
    // if ALUControl[0] is 0 the add, if 1 then subtract
    assign condinvb = ALUControl[0] ? ~b : b;
    assign sum = a + condinvb + ALUControl[0] + carryIn;
 
    always_comb
-     casex (ALUControl[1:0])
-       2'b0?:  Result = sum;
-       2'b10:  Result = a & b;
-       2'b11:  Result = a | b;
+     casex (ALUControl[2:0])
+       3'b00?:  Result = sum;
+       3'b010:  Result = a & b;
+       3'b011:  Result = a | b;
        default: Result = 32'bx;
      endcase
 
@@ -505,14 +511,15 @@ module shifter(input logic [6:0] shiftIn,
                 input logic [31:0] dataIn,
                 output logic [31:0] dataOut);
       logic [1:0] shiftType = shiftIn[1:0];
+      logic shift[4:0] = shiftIn[6:2];
 
       always_comb
         case(shiftType)
-          2'b00: assign dataOut = dataIn << shiftIn[6:2];
-          2'b01: assign dataOut = dataIn >> shiftIn[6:2];
-          2'b10: assign dataOut = dataIn >>> shiftIn[6:2];
-          2'b11: assign out = {dataIn[30:1], in[31]}; // need to repeat this n times
-          default: dataOut = dataIn
+          2'b00: assign dataOut = dataIn << shift;
+          2'b01: assign dataOut = dataIn >> shift;
+          2'b10: assign dataOut = dataIn >>> shift;
+          2'b11: assign dataOut = {dataIn[30:1], dataIn[31]}; // need to repeat this n times
+          default: dataOut = dataIn;
         endcase
 
 
