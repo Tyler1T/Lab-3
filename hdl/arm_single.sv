@@ -84,7 +84,7 @@ module arm (input  logic        clk, reset,
             input  logic        PCReady);
 
    logic [3:0] ALUFlags;
-   logic       RegWrite, ALUSrc, MemtoReg, PCSrc;
+   logic       RegWrite, ALUSrc, MemtoReg, PCSrc, previousCarry;
    logic [2:0] RegSrc;
    logic [1:0] ImmSrc, ALUControl;
 
@@ -100,7 +100,9 @@ module arm (input  logic        clk, reset,
                  .MemWrite(MemWrite),
                  .MemtoReg(MemtoReg),
                  .PCSrc(PCSrc),
-                 .MemStrobe(MemStrobe));
+                 .MemStrobe(MemStrobe),
+                 .previousCarry(previousCarry),
+                 .carryControl(carryControl));
    datapath dp (.clk(clk),
                 .reset(reset),
                 .RegSrc(RegSrc),
@@ -130,10 +132,12 @@ module controller (input  logic         clk, reset,
                    output logic [ 2:0]  ALUControl,
                    output logic         MemWrite, MemtoReg,
                    output logic         PCSrc,
-                   output logic         MemStrobe);
+                   output logic         MemStrobe,
+                   output logic         previousCarry,
+                   output logic         carryControl);
 
    logic [1:0] FlagW;
-   logic       PCS, RegW, MemW, write;
+   logic       PCS, RegW, MemW, write, carryControl;
 
    decoder dec (.Op(Instr[27:26]),
                 .Funct(Instr[25:20]),
@@ -143,6 +147,7 @@ module controller (input  logic         clk, reset,
                 .RegW(RegW),
                 .MemW(MemW),
                 .write(write),
+                .carryControl(carryControl),
                 .MemtoReg(MemtoReg),
                 .ALUSrc(ALUSrc),
                 .ImmSrc(ImmSrc),
@@ -160,14 +165,15 @@ module controller (input  logic         clk, reset,
                  .MemW(MemW),
                  .PCSrc(PCSrc),
                  .RegWrite(RegWrite),
-                 .MemWrite(MemWrite));
+                 .MemWrite(MemWrite),
+                 .previousCarry(previousCarry));
 endmodule
 
 module decoder (input  logic [1:0] Op,
                 input  logic [5:0] Funct,
                 input  logic [3:0] Rd,
                 output logic [1:0] FlagW,
-                output logic       PCS, RegW, MemW, noWrite,
+                output logic       PCS, RegW, MemW, noWrite, carryControl,
                 output logic       MemtoReg, ALUSrc,
                 output logic [1:0] ImmSrc,
                 output logic [2:0] ALUControl,
@@ -205,17 +211,23 @@ module decoder (input  logic [1:0] Op,
          case(Funct[4:1])
            4'b0100: ALUControl = 3'b000; // ADD
            4'b0101: ALUControl = 3'b000; // ADD + carry
+                    carryControl = 1;
            4'b0010: ALUControl = 3'b001; // SUB
            4'b0110: ALUControl = 3'b001; // SUB + carry
            4'b0000: ALUControl = 3'b010; // AND
            4'b1100: ALUControl = 3'b011; // ORR
-           4'b1010: ALUControl = 3'b001; // CMP = SUB + noWrite
+           4'b1010: begin
+                      endALUControl = 3'b001; // CMP = SUB + noWrite
+                      noWrite = 1'b1;
+                      carryControl = 1'b0;
+                    end
+           4'b1001: ALUControl = 3'b110; // TEQ = EOR + noWrite
                     noWrite = 1'b1;
-           4'b1001: ALUControl = 3'b011; // TEQ = EOR + noWrite
            4'b1000: ALUControl = 3'b010; // TST = AND + noWrite
+                    noWrite = 1'b1;
            4'b1011: ALUControl = 3'b000; // CMN = ADD + noWrite
                     noWrite = 1'b1;
-           4'b1111: ALUControl = 3'b101; // MVN 
+           4'b1111: ALUControl = 3'b101; // MVN
            4'b0001: ALUControl = 3'b110; //EOR
            4'b1110: ALUControl = 3'b100; //BIC = Rn & ~Src2
            default: ALUControl = 3'bx;  // unimplemented
@@ -224,11 +236,11 @@ module decoder (input  logic [1:0] Op,
          // (C & V only updated for arith instructions)
          FlagW[1]      = Funct[0]; // FlagW[1] = S-bit, all instructions
          // FlagW[0] = S-bit & (ADD | SUB) ADD and SUB only
-         FlagW[0]      = Funct[0] & (ALUControl == 2'b00 | ALUControl == 2'b01);
+         FlagW[0]      = Funct[0] & (ALUControl == 3'b000 | ALUControl == 3'b001);
        end
      else
        begin
-         ALUControl = 2'b00; // add for non-DP instructions
+         ALUControl = 3'b000; // add for non-DP instructions
          FlagW      = 2'b00; // don't update Flags
        end
 
@@ -243,7 +255,7 @@ module condlogic (input  logic       clk, reset,
                   input  logic       noWrite,
                   input  logic [1:0] FlagW,
                   input  logic       PCS, RegW, MemW,
-                  output logic       PCSrc, RegWrite, MemWrite);
+                  output logic       PCSrc, RegWrite, MemWrite, previousCarry);
 
    logic [1:0] FlagWrite;
    logic [3:0] Flags;
@@ -269,6 +281,7 @@ module condlogic (input  logic       clk, reset,
    assign RegWrite  = RegW  & CondEx & ~noWrite;
    assign MemWrite  = MemW  & CondEx;
    assign PCSrc     = PCS   & CondEx;
+   assign previousCarry = Flags[1];
 
 endmodule // condlogic
 
@@ -311,6 +324,8 @@ module datapath (input  logic        clk, reset,
                  input  logic [ 2:0]  ALUControl,
                  input  logic        MemtoReg,
                  input  logic        PCSrc,
+                 input  logic        previousCarry,
+                 input  logic        carryControl,
                  output logic [ 3:0]  ALUFlags,
                  output logic [31:0] PC,
                  input  logic [31:0] Instr,
@@ -386,7 +401,8 @@ module datapath (input  logic        clk, reset,
    alu         alu (.a(SrcA),
                     .b(SrcB),
                     .ALUControl(ALUControl),
-                    .carryIn(carryIn),
+                    .carryIn(previousCarry),
+                    .carryControl(carryControl),
                     .Result(ALUResult),
                     .ALUFlags(ALUFlags));
 endmodule // datapath
@@ -395,7 +411,6 @@ module regfile (input  logic        clk,
                 input  logic        we3,
                 input  logic [ 3:0] ra1, ra2, wa3,
                 input  logic [31:0] wd3, r15,
-                input  logic [6:0] shift,
                 output logic [31:0] rd1, rd2);
 
    logic [31:0] rf[14:0];
@@ -432,10 +447,9 @@ endmodule // extend
 
 module adder #(parameter WIDTH=8)
    (input  logic [WIDTH-1:0] a, b,
-    input  logic carryIn,
     output logic [WIDTH-1:0] y);
 
-   assign y = a + b + carryIn;
+   assign y = a + b;
 
 endmodule // adder
 
@@ -474,26 +488,30 @@ endmodule // mux2
 module alu (input  logic [31:0] a, b,
             input  logic [2:0] ALUControl,
             input  logic carryIn,
+            input  logic carryControl,
             output logic [31:0] Result,
-            output logic [ 3:0] ALUFlags,
-            input logic noWrite);
+            output logic [ 3:0] ALUFlags);
 
-   logic        neg, zero, carry, overflow;
+   logic        neg, zero, carry, overflow, Cin;
    logic [31:0] condinvb;
    logic [32:0] sum;
+   assign Cin = carryIn & carryControl;
 
 
 
    // check if we are adding or subtracting and set b accordingly
    // if ALUControl[0] is 0 the add, if 1 then subtract
    assign condinvb = ALUControl[0] ? ~b : b;
-   assign sum = a + condinvb + ALUControl[0] + carryIn;
+   assign sum = a + condinvb + ALUControl[0] + Cin;
 
    always_comb
      casex (ALUControl[2:0])
        3'b00?:  Result = sum;
        3'b010:  Result = a & b;
        3'b011:  Result = a | b;
+       3'b110:  Result = a ^ b;
+       3'b101:  Result = ~a;
+       3'b100:  Result = a ^ ~b;
        default: Result = 32'bx;
      endcase
 
@@ -511,13 +529,12 @@ module shifter(input logic [6:0] shiftIn,
                 input logic [31:0] dataIn,
                 output logic [31:0] dataOut);
       logic [1:0] shiftType = shiftIn[1:0];
-      logic shift[4:0] = shiftIn[6:2];
 
       always_comb
         case(shiftType)
-          2'b00: assign dataOut = dataIn << shift;
-          2'b01: assign dataOut = dataIn >> shift;
-          2'b10: assign dataOut = dataIn >>> shift;
+          2'b00: assign dataOut = dataIn << shiftIn[6:2];
+          2'b01: assign dataOut = dataIn >> shiftIn[6:2];
+          2'b10: assign dataOut = dataIn >>> shiftIn[6:2];
           2'b11: assign dataOut = {dataIn[30:1], dataIn[31]}; // need to repeat this n times
           default: dataOut = dataIn;
         endcase
