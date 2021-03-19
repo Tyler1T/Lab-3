@@ -217,6 +217,7 @@ module decoder (input  logic [1:0] Op,
                     noWrite = 1'b1;
            4'b1111: ALUControl = 3'b101; // MVN
            4'b0001: ALUControl = 3'b110; //EOR
+           4'b1101: ALUControl = 3'b111; //MOV
            4'b1110: ALUControl = 3'b100; //BIC = Rn & ~Src2
            default: ALUControl = 3'bx;  // unimplemented
          endcase
@@ -515,10 +516,10 @@ module shifter(input logic [6:0] shiftIn,
 
       always_comb
         case(shiftType)
-          2'b00: assign dataOut = dataIn << shift;
-          2'b01: assign dataOut = dataIn >> shift;
-          2'b10: assign dataOut = dataIn >>> shift;
-          2'b11: assign dataOut = {dataIn[30:1], dataIn[31]}; // need to repeat this n times
+          2'b00: assign dataOut = dataIn << shift; //LSL
+          2'b01: assign dataOut = dataIn >> shift; //LSR
+          2'b10: assign dataOut = dataIn >>> shift; //ASR
+          2'b11: assign dataOut = {dataIn, dataIn} >> (shift[4:0]); // need to repeat this n times //ROR
           default: dataOut = dataIn;
         endcase
 
