@@ -218,7 +218,6 @@ module decoder (input  logic [1:0] Op,
                       ALUControl = 3'b000; // ADD + carry
                       noWrite = 0'b1;
                       carryControl = 1'b1;
-
                     end
            4'b0010: begin
                       ALUControl = 3'b001; // SUB
