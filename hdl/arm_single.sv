@@ -275,6 +275,7 @@ module decoder (input  logic [1:0] Op,
                       noWrite = 0'b1;
                       carryControl = 0'b0;
                     end
+
            default: ALUControl = 3'bx;  // unimplemented
          endcase
          // update flags if S bit is set
