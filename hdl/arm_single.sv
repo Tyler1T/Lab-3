@@ -84,9 +84,9 @@ module arm (input  logic        clk, reset,
             input  logic        PCReady);
 
    logic [3:0] ALUFlags;
-   logic       RegWrite, ALUSrc, MemtoReg, PCSrc, previousCarry;
-   logic [2:0] RegSrc;
-   logic [1:0] ImmSrc, ALUControl;
+   logic       RegWrite, ALUSrc, MemtoReg, PCSrc, previousCarry, carryControl;
+   logic [2:0] RegSrc, ALUControl;
+   logic [1:0] ImmSrc;
 
    controller c (.clk(clk),
                  .reset(reset),
@@ -112,6 +112,8 @@ module arm (input  logic        clk, reset,
                 .ALUControl(ALUControl),
                 .MemtoReg(MemtoReg),
                 .PCSrc(PCSrc),
+                .previousCarry(previousCarry),
+                .carryControl(carryControl),
                 .ALUFlags(ALUFlags),
                 .PC(PC),
                 .Instr(Instr),
@@ -137,7 +139,7 @@ module controller (input  logic         clk, reset,
                    output logic         carryControl);
 
    logic [1:0] FlagW;
-   logic       PCS, RegW, MemW, write, carryControl;
+   logic       PCS, RegW, MemW, noWrite;
 
    decoder dec (.Op(Instr[27:26]),
                 .Funct(Instr[25:20]),
@@ -146,7 +148,7 @@ module controller (input  logic         clk, reset,
                 .PCS(PCS),
                 .RegW(RegW),
                 .MemW(MemW),
-                .write(write),
+                .noWrite(noWrite),
                 .carryControl(carryControl),
                 .MemtoReg(MemtoReg),
                 .ALUSrc(ALUSrc),
@@ -158,7 +160,7 @@ module controller (input  logic         clk, reset,
                  .reset(reset),
                  .Cond(Instr[31:28]),
                  .ALUFlags(ALUFlags),
-                 .write(write),
+                 .noWrite(noWrite),
                  .FlagW(FlagW),
                  .PCS(PCS),
                  .RegW(RegW),
@@ -240,7 +242,7 @@ module decoder (input  logic [1:0] Op,
                       carryControl = 0'b0;
                     end
            4'b1010: begin
-                      endALUControl = 3'b001; // CMP = SUB + noWrite
+                      ALUControl = 3'b001; // CMP = SUB + noWrite
                       noWrite = 1'b1;
                       carryControl = 0'b0;
                     end
@@ -427,7 +429,7 @@ module datapath (input  logic        clk, reset,
                    .r15(PCPlus8),
                    .rd1(SrcA),
                    .rd2(WriteData));
-   shifter     shifter (.shift(Instr[11:5]),
+   shifter     shifter (.shiftIn(Instr[11:5]),
                         .dataIn(WriteData),
                         .dataOut(toMuxB));
    mux2 #(32)  resmux (.d0(ALUResult),
@@ -575,15 +577,15 @@ module shifter(input logic [6:0] shiftIn,
                 input logic [31:0] dataIn,
                 output logic [31:0] dataOut);
       logic [1:0] shiftType = shiftIn[1:0];
+      logic [31:0] test;
 
       always_comb
         case(shiftType)
-          2'b00: assign dataOut = dataIn << shiftIn[6:2];
-          2'b01: assign dataOut = dataIn >> shiftIn[6:2];
-          2'b10: assign dataOut = dataIn >>> shiftIn[6:2];
-          2'b11: assign dataOut = {dataIn, dataIn} >> (shift[3:0]); // need to repeat this n times
-          default: dataOut = dataIn;
+          2'b00: test = dataIn << shiftIn[6:2];
+          2'b01: test = dataIn >> shiftIn[6:2];
+          2'b10: test = dataIn >>> shiftIn[6:2];
+          2'b11: test = {dataIn, dataIn} >> (shiftIn[6:2]); // need to repeat this n times
         endcase
-
+        assign dataOut = test;
 
 endmodule // shifter
