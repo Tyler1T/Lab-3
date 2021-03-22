@@ -1,7 +1,7 @@
 # Copyright 1991-2007 Mentor Graphics Corporation
-# 
+#
 # Modification by Oklahoma State University
-# Use with Testbench 
+# Use with Testbench
 # James Stine, 2008
 # Go Cowboys!!!!!!
 #
@@ -26,7 +26,7 @@ if [file exists work] {
 }
 vlib work
 
-set MEMORY_FILE ./memfile.dat
+set MEMORY_FILE ./additest.dat
 
 # compile source files
 vlog imem.v dmem.v arm_single.sv top.sv tb.sv
@@ -64,7 +64,7 @@ add wave -noupdate -divider -height 32 "pcmux"
 add wave -hex /testbench/dut/arm/dp/pcmux/*
 
 
--- Set Wave Output Items 
+-- Set Wave Output Items
 TreeUpdate [SetDefaultTree]
 WaveRestoreZoom {0 ps} {200 ns}
 configure wave -namecolwidth 250

@@ -276,6 +276,11 @@ module decoder (input  logic [1:0] Op,
                       noWrite = 0'b1;
                       carryControl = 0'b0;
                     end
+           4'b1101: begin
+                       ALUControl = 3'b111; //MOV
+                       noWrite = 0'b0;
+                       carryControl = 0'b0;
+                     end
 
            default: ALUControl = 3'bx;  // unimplemented
          endcase
@@ -429,7 +434,8 @@ module datapath (input  logic        clk, reset,
                    .r15(PCPlus8),
                    .rd1(SrcA),
                    .rd2(WriteData));
-   shifter     shifter (.shiftIn(Instr[11:5]),
+   shifter     shifter (.Ibit(Instr[25]),
+                        .shiftIn(Instr[11:5]),
                         .dataIn(WriteData),
                         .dataOut(toMuxB));
    mux2 #(32)  resmux (.d0(ALUResult),
@@ -573,19 +579,19 @@ module alu (input  logic [31:0] a, b,
 
 endmodule // alu
 
-module shifter(input logic [6:0] shiftIn,
+module shifter(input logic Ibit,
+                input logic [6:0] shiftIn,
                 input logic [31:0] dataIn,
                 output logic [31:0] dataOut);
-      logic [1:0] shiftType = shiftIn[1:0];
       logic [31:0] test;
 
       always_comb
-        case(shiftType)
+        case(shiftIn[1:0])
           2'b00: test = dataIn << shiftIn[6:2];
           2'b01: test = dataIn >> shiftIn[6:2];
           2'b10: test = dataIn >>> shiftIn[6:2];
           2'b11: test = {dataIn, dataIn} >> (shiftIn[6:2]); // need to repeat this n times
         endcase
-        assign dataOut = test;
+      assign dataOut = Ibit ? test : dataIn;
 
 endmodule // shifter
